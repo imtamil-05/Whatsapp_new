@@ -57,6 +57,9 @@ class _StatusPageState extends State<StatusPage> {
           userName: widget.userName,
           photo: widget.photo,
           type: PreviewType.status,
+          onsend: (caption) async {
+            await sendStatus(File(pickedFile.path), caption);
+          },
         ),
       ),
     );

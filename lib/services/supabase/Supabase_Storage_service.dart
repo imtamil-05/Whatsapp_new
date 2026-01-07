@@ -21,16 +21,23 @@ class SupabaseStorageService {
   }
 
    Future<String> uploadStatusImage(File file, String userId) async {
-    final fileName =
-        'status/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final fileName ='${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final path = 'status/$userId/$fileName'; 
+
+    final bytes = await file.readAsBytes();
 
     await _supabase.storage
         .from('status')
-        .upload(fileName, file);
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(
+            contentType: 'image/jpeg',
+          ));
 
     final imageUrl = _supabase.storage
         .from('status')
-        .getPublicUrl(fileName);
+        .getPublicUrl(path);
 
     return imageUrl;
   }

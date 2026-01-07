@@ -21,7 +21,7 @@ class ChatPage extends StatefulWidget {
   late dynamic time;
   final String chatRoomId;
   final String currentUserId;
-  final String peerUserId; 
+  final String peerUserId;
 
   ChatPage({
     Key? key,
@@ -41,43 +41,67 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final Chatmessagecontroller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore firebaseFirestore = FirebaseFirestore.instance;
   File? selectedImage;
   bool isUploading = false;
   double uploadProgress = 0.0;
   Map<String, dynamic>? user;
+  String? replyMessage;
+  String? replyMessageId;
 
-  void showDeleteOptions(
+  void showDeleteDialog(
     BuildContext context,
     String messageId,
     String chatRoomId,
     bool isMe,
   ) {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.delete),
-              title: Text('Delete for me'),
-              onTap: () {
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: const Text(
+            'Delete message?',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          content: const Text(
+            'This message will be deleted.',
+            style: TextStyle(fontSize: 14),
+          ),
+          actionsPadding: const EdgeInsets.only(bottom: 8, right: 8),
+          actions: [
+            // CANCEL
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
+            ),
+
+            // DELETE FOR ME
+            TextButton(
+              onPressed: () {
                 deleteForMe(chatRoomId, messageId);
                 Navigator.pop(context);
               },
+              child: const Text('DELETE FOR ME'),
             ),
+
+            // DELETE FOR EVERYONE (only sender)
             if (isMe)
-              ListTile(
-                leading: Icon(Icons.delete_forever, color: Colors.red),
-                title: Text('Delete for everyone'),
-                onTap: () {
+              TextButton(
+                onPressed: () {
                   deleteForEveryone(chatRoomId, messageId);
                   Navigator.pop(context);
                 },
+                child: const Text(
+                  'DELETE FOR EVERYONE',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
           ],
         );
@@ -132,65 +156,67 @@ class _ChatPageState extends State<ChatPage> {
     if (pickedFile != null) {
       setState(() {
         selectedImage = File(pickedFile.path);
-      }); 
+      });
     }
   }
 
   Future<void> pickAndSendImage(ImageSource source) async {
-  final picker = ImagePicker();
-  final pickedFile =
-      await picker.pickImage(source: source, imageQuality: 70);
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 70);
 
-  if (pickedFile == null) return;
+    if (pickedFile == null) return;
 
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ImagePreviewScreen(
-        receiverId: widget.peerUserId,
-        chatRoomId: widget.chatRoomId,
-        senderId: widget.currentUserId,
-        imageFile: File(pickedFile.path),
-        type: PreviewType.chat,
-        onsend: (caption) async {
-          await sendImage(File(pickedFile.path), caption);
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ImagePreviewScreen(
+          receiverId: widget.peerUserId,
+          chatRoomId: widget.chatRoomId,
+          senderId: widget.currentUserId,
+          imageFile: File(pickedFile.path),
+          type: PreviewType.chat,
+          onsend: (caption) async {
+            await sendImage(File(pickedFile.path), caption);
+          },
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Future<void> sendImage(File file, String caption) async {
-  final chatRoomId = getchatRoomId(widget.senderId, widget.receiverId);
+    final chatRoomId = getchatRoomId(widget.senderId, widget.receiverId);
 
-  // 1️⃣ Upload image
-  final imageUrl =
-      await SupabaseStorageService().uploadChatImage(file, widget.senderId);
+    // 1️⃣ Upload image
+    final imageUrl = await SupabaseStorageService().uploadChatOrStatusImage(
+      file:file,
+      userId: widget.senderId,
+      folder: 'chats',
+      
+    );
 
-  // 2️⃣ Save message in Firestore
-  await firebaseFirestore
-      .collection("chats")
-      .doc(chatRoomId)
-      .collection("messages")
-      .add({
-    "imageUrl": imageUrl,
-    "text": caption,
-    "senderId": widget.senderId,
-    "receiverId": widget.receiverId,
-    "timestamp": FieldValue.serverTimestamp(),
-    "status": "sent",
-    "type": "image",
-    "deletedFor": [],
-    "isDeletedForEveryone": false,
-  });
+    // 2️⃣ Save message in Firestore
+    await firebaseFirestore
+        .collection("chats")
+        .doc(chatRoomId)
+        .collection("messages")
+        .add({
+          "imageUrl": imageUrl,
+          "text": caption,
+          "senderId": widget.senderId,
+          "receiverId": widget.receiverId,
+          "timestamp": FieldValue.serverTimestamp(),
+          "status": "sent",
+          "type": "image",
+          "deletedFor": [],
+          "isDeletedForEveryone": false,
+        });
 
-  // 3️⃣ Update chat list
-  await firebaseFirestore.collection("chats").doc(chatRoomId).set({
-    "lastMessage": "📷 Photo",
-    "lastMessageTime": FieldValue.serverTimestamp(),
-  }, SetOptions(merge: true));
-}
-
+    // 3️⃣ Update chat list
+    await firebaseFirestore.collection("chats").doc(chatRoomId).set({
+      "lastMessage": "📷 Photo",
+      "lastMessageTime": FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
 
   void markMessagesAsRead(String chatId) {
     FirebaseFirestore.instance
@@ -234,8 +260,15 @@ class _ChatPageState extends State<ChatPage> {
           "type": "text",
           "deletedFor": [],
           "isDeletedForEveryone": false,
+          'replyTo': replyMessage,
+          'replyToId': replyMessageId,
+          'type': 'text',
         });
 
+    setState(() {
+      replyMessage = null;
+      replyMessageId = null;
+    });
     await firebaseFirestore.collection("chats").doc(chatRoomId).set({
       "users": [widget.senderId, widget.receiverId],
       "lastMessage": Chatmessagecontroller.text,
@@ -261,6 +294,21 @@ class _ChatPageState extends State<ChatPage> {
     final chatId = getchatRoomId(widget.senderId, widget.receiverId);
     markMessagesAsRead(chatId);
     loadUser();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+ 
+
+  void onReplyMessage(String message, String messageId) {
+    setState(() {
+      replyMessage = message;
+      replyMessageId = messageId;
+    });
   }
 
   @override
@@ -372,10 +420,14 @@ class _ChatPageState extends State<ChatPage> {
                         .toList();
 
                     return ListView.builder(
+                      controller: _scrollController,
                       itemCount: snapshot.data!.docs.length,
                       itemBuilder: (context, index) {
                         final doc = snapshot.data!.docs[index];
                         final message = doc.data() as Map<String, dynamic>;
+
+                       
+
                         final deletedFor = List<String>.from(
                           message['deletedFor'] ?? [],
                         );
@@ -404,7 +456,7 @@ class _ChatPageState extends State<ChatPage> {
                         if (message['type'] == 'image') {
                           return GestureDetector(
                             onLongPress: () {
-                              showDeleteOptions(
+                              showDeleteDialog(
                                 context,
                                 doc.id,
                                 chatRoomId,
@@ -417,6 +469,8 @@ class _ChatPageState extends State<ChatPage> {
                               imageUrl: message['imageUrl'],
                               status: message['status'] ?? 'sent',
                               timestamp: message['timestamp']?.toDate(),
+                              isDeletedForEveryone:
+                                  message['isDeletedForEveryone'] ?? false,
                             ),
                           );
                         }
@@ -476,12 +530,19 @@ class _ChatPageState extends State<ChatPage> {
 
                         return GestureDetector(
                           onLongPress: () {
-                            showDeleteOptions(
-                              context,
-                              doc.id,
-                              chatRoomId,
-                              isMe,
-                            );
+                            showDeleteDialog(context, doc.id, chatRoomId, isMe);
+                          },
+                          onHorizontalDragEnd: (details) {
+                            if (details.primaryVelocity != null &&
+                                details.primaryVelocity! > 0) {
+                              // 👉 Swiped RIGHT
+                              onReplyMessage(
+                                message['type'] == 'image'
+                                    ? '📷 Photo'
+                                    : message['text'],
+                                doc.id,
+                              );
+                            }
                           },
                           child: MessageBubble(
                             isMe: isMe,
@@ -489,6 +550,8 @@ class _ChatPageState extends State<ChatPage> {
                             imageUrl: null,
                             status: message['status'] ?? 'sent',
                             timestamp: message['timestamp']?.toDate(),
+                            isDeletedForEveryone:
+                                message['isDeletedForEveryone'] ?? false,
                           ),
                         );
 
@@ -628,7 +691,13 @@ class _ChatPageState extends State<ChatPage> {
                       radius: 25,
                       backgroundColor: Colors.teal,
                       child: IconButton(
-                        onPressed: sendMessage,
+                        onPressed: () async {
+                          if (Chatmessagecontroller.text.trim().isEmpty) return;
+
+                          await sendMessage(); // 🔹 send message to Firestore
+                          Chatmessagecontroller.clear(); // 🔹 clear input box
+                        
+                        },
                         icon: Icon(Icons.send),
                       ),
                     ),

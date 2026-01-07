@@ -59,13 +59,13 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
       setState(() {
         currentIndex++;
       });
-     if (_pageController.hasClients) {
-  _pageController.animateToPage(
-    currentIndex,
-    duration: const Duration(milliseconds: 300),
-    curve: Curves.easeIn,
-  );
-}
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          currentIndex,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeIn,
+        );
+      }
       startTimer();
     } else {
       Navigator.pop(context); // close after last
@@ -171,39 +171,40 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
                 setState(() => currentIndex = index);
               },
               itemBuilder: (context, index) {
-                final data=widget.statuses[index].data() as Map<String, dynamic>;
-                final imageUrl=data['imageUrl'];
-                final caption=data.containsKey('caption')?data['caption']:"";
+                final data =
+                    widget.statuses[index].data() as Map<String, dynamic>;
+                final imageUrl = data['imageUrl'];
+                final caption = data.containsKey('caption')
+                    ? data['caption']
+                    : "";
                 return Stack(
-                  children:[ Center(
-                    child: Image.network(
-                      imageUrl,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return CircularProgressIndicator(color: Colors.teal);
-                      },
+                  children: [
+                    Center(
+                      child: Image.network(
+                        imageUrl,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return CircularProgressIndicator(color: Colors.teal);
+                        },
+                      ),
                     ),
-                  ),
-                   if (caption != null && caption.toString().trim().isNotEmpty)
-        Positioned(
-          bottom: 40,
-          left: 20,
-          right: 20,
-          child: Text(
-            caption,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              shadows: [
-                Shadow(
-                  blurRadius: 6,
-                  color: Colors.black,
-                ),
-              ],
-            ),
-          ),
-        ),
+                    if (caption != null && caption.toString().trim().isNotEmpty)
+                      Positioned(
+                        bottom: 40,
+                        left: 20,
+                        right: 20,
+                        child: Text(
+                          caption,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            shadows: [
+                              Shadow(blurRadius: 6, color: Colors.black),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 );
               },
@@ -230,7 +231,6 @@ class _StatusViewScreenState extends State<StatusViewScreen> {
                 ),
               ),
             ),
-          
 
             // Positioned(
             //     top: 10,

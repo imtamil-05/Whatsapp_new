@@ -7,6 +7,7 @@ class MessageBubble extends StatelessWidget {
   final String? imageUrl;
   final String status;
   final DateTime? timestamp;
+  final bool isDeletedForEveryone;
 
   const MessageBubble({
     super.key,
@@ -15,6 +16,7 @@ class MessageBubble extends StatelessWidget {
     this.imageUrl,
     required this.status,
     this.timestamp,
+    required this.isDeletedForEveryone,
   });
 
   Icon getStatusIcon(String status) {
@@ -29,14 +31,15 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isDeletedForEveryone) {
+      return DeletedMessageBubble(isMe: isMe);
+    }
+
     String messageTime = timestamp != null
         ? DateFormat('hh:mm a').format(timestamp!)
         : '';
-    
 
     if (imageUrl != null && imageUrl!.isNotEmpty) {
-     
-      
       return Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
@@ -46,40 +49,40 @@ class MessageBubble extends StatelessWidget {
             color: isMe ? Colors.teal : Colors.white,
             borderRadius: BorderRadius.circular(10),
           ),
-           child: Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  imageUrl!,
-                  width: 200,
-                  fit: BoxFit.cover,
-                )),
-                if(text!=null&&text!.trim().isNotEmpty)
-                 Padding(
+                child: Image.network(imageUrl!, width: 200, fit: BoxFit.cover),
+              ),
+              if (text != null && text!.trim().isNotEmpty)
+                Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(text!,style: TextStyle(color: isMe?Colors.white:Colors.black),),
+                  child: Text(
+                    text!,
+                    style: TextStyle(color: isMe ? Colors.white : Colors.black),
+                  ),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      messageTime,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isMe ? Colors.white : Colors.black,
-                      ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    messageTime,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isMe ? Colors.white : Colors.black,
                     ),
-                    if (isMe) const SizedBox(width: 4),
-                    if (isMe) getStatusIcon(status),
-                  ],
-                ),
-            ]
-           ),
+                  ),
+                  if (isMe) const SizedBox(width: 4),
+                  if (isMe) getStatusIcon(status),
+                ],
+              ),
+            ],
+          ),
           // Stack(
           //   children: [
           //     Image.network(imageUrl!, width: 200, fit: BoxFit.cover),
@@ -133,18 +136,15 @@ class MessageBubble extends StatelessWidget {
                 fontSize: 10,
                 color: Color.fromARGB(255, 71, 62, 62),
               ),
-          
             ),
-            if (isMe) ...[
-              const SizedBox(width: 4),
-              getStatusIcon(status),
-            ],
+            if (isMe) ...[const SizedBox(width: 4), getStatusIcon(status)],
           ],
         ),
       ),
     );
   }
 }
+
 class DeletedMessageBubble extends StatelessWidget {
   final bool isMe;
 

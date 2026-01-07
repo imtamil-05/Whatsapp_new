@@ -56,11 +56,13 @@ class _ImagePreviewScreenState extends State<ImagePreviewScreen> {
 
   Future<void> onSend() async {
     if (uploading) return;
-    setState(() {
-      uploading = true;
-    });
+    
+    if (widget.senderId == null) {
+      debugPrint("SenderId is null");
+      return;
+    }
 
-   
+    setState(() => uploading = true);
 
  
     final imageUrl= await SupabaseStorageService().uploadChatOrStatusImage(file: widget.imageFile, userId: widget.senderId!, folder: widget.type == PreviewType.chat ? 'chats' : 'status',);
