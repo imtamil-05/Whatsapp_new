@@ -8,6 +8,8 @@ class MessageBubble extends StatelessWidget {
   final String status;
   final DateTime? timestamp;
   final bool isDeletedForEveryone;
+  final String? replyText;
+  final VoidCallback? onReplyTap;
 
   const MessageBubble({
     super.key,
@@ -17,6 +19,8 @@ class MessageBubble extends StatelessWidget {
     required this.status,
     this.timestamp,
     required this.isDeletedForEveryone,
+    this.replyText,
+    this.onReplyTap,
   });
 
   Icon getStatusIcon(String status) {
@@ -25,7 +29,7 @@ class MessageBubble extends StatelessWidget {
     } else if (status == 'delivered') {
       return const Icon(Icons.done_all, size: 16, color: Colors.grey);
     } else {
-      return const Icon(Icons.done_all, size: 16, color: Colors.blue);
+      return const Icon(Icons.done_all, size: 16, color: Colors.cyan);
     }
   }
 
@@ -53,6 +57,12 @@ class MessageBubble extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              if (replyText != null)
+               GestureDetector(
+                onTap: onReplyTap,
+                child: replyBoxUI(
+                    context
+                )),
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: Image.network(imageUrl!, width: 200, fit: BoxFit.cover),
@@ -119,27 +129,66 @@ class MessageBubble extends StatelessWidget {
           color: isMe ? Colors.teal : Colors.white,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
           children: [
-            Flexible(
-              child: Text(
-                text ?? '',
-                style: TextStyle(color: isMe ? Colors.white : Colors.teal),
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (replyText != null)
+                  GestureDetector(onTap: onReplyTap, child: replyBoxUI(context)),
+
+                Text(
+                  text ?? '',
+                  style: TextStyle(color: isMe ? Colors.white : Colors.black),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text(
+                      messageTime,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color.fromARGB(255, 71, 62, 62),
+                      ),
+                    ),
+                  ],
+                ),
+                if (isMe) ...[const SizedBox(width: 4), getStatusIcon(status)],
+              ],
             ),
-            const SizedBox(width: 6),
-            Text(
-              messageTime,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color.fromARGB(255, 71, 62, 62),
-              ),
-            ),
-            if (isMe) ...[const SizedBox(width: 4), getStatusIcon(status)],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget replyBoxUI(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 36,
+            color: isMe ? Colors.white : Colors.teal,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            replyText!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ],
       ),
     );
   }

@@ -49,6 +49,8 @@ class _ChatPageState extends State<ChatPage> {
   Map<String, dynamic>? user;
   String? replyMessage;
   String? replyMessageId;
+  final Map<String, GlobalKey> messageKeys = {};
+  String? highlightedMessageId;
 
   void showDeleteDialog(
     BuildContext context,
@@ -188,10 +190,9 @@ class _ChatPageState extends State<ChatPage> {
 
     // 1️⃣ Upload image
     final imageUrl = await SupabaseStorageService().uploadChatOrStatusImage(
-      file:file,
+      file: file,
       userId: widget.senderId,
       folder: 'chats',
-      
     );
 
     // 2️⃣ Save message in Firestore
@@ -302,14 +303,33 @@ class _ChatPageState extends State<ChatPage> {
     super.dispose();
   }
 
- 
-
   void onReplyMessage(String message, String messageId) {
     setState(() {
       replyMessage = message;
       replyMessageId = messageId;
     });
   }
+
+  void scrollToMessage(String messageId) {
+  final key = messageKeys[messageId];
+  if (key == null) return;
+
+  final context = key.currentContext;
+  if (context == null) return;
+
+  Scrollable.ensureVisible(
+    context,
+    duration: const Duration(milliseconds: 300),
+    curve: Curves.easeInOut,
+  );
+
+  setState(() => highlightedMessageId = messageId);
+
+  Future.delayed(const Duration(seconds: 2), () {
+    setState(() => highlightedMessageId = null);
+  });
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -426,8 +446,6 @@ class _ChatPageState extends State<ChatPage> {
                         final doc = snapshot.data!.docs[index];
                         final message = doc.data() as Map<String, dynamic>;
 
-                       
-
                         final deletedFor = List<String>.from(
                           message['deletedFor'] ?? [],
                         );
@@ -448,155 +466,113 @@ class _ChatPageState extends State<ChatPage> {
                           );
                         }
 
+                        final messageId = doc.id;
+                        messageKeys.putIfAbsent(messageId, () => GlobalKey());
+
                         final isMe = message['senderId'] == widget.senderId;
                         final Timestamp? timeStamp = message['timestamp'];
                         final String messageTime = timeStamp != null
                             ? DateFormat('hh:mm a').format(timeStamp.toDate())
                             : '';
                         if (message['type'] == 'image') {
-                          return GestureDetector(
-                            onLongPress: () {
-                              showDeleteDialog(
-                                context,
-                                doc.id,
-                                chatRoomId,
-                                message['senderId'] == widget.senderId,
-                              );
-                            },
-                            child: MessageBubble(
-                              isMe: message['senderId'] == widget.senderId,
-                              text: message['text'],
-                              imageUrl: message['imageUrl'],
-                              status: message['status'] ?? 'sent',
-                              timestamp: message['timestamp']?.toDate(),
-                              isDeletedForEveryone:
-                                  message['isDeletedForEveryone'] ?? false,
-                            ),
-                          );
-                        }
-
-                        // Align(
-                        //   alignment: isMe
-                        //       ? Alignment.centerRight
-                        //       : Alignment.centerLeft,
-                        //   child: Container(
-                        //     margin: EdgeInsets.symmetric(vertical: 5),
-                        //     padding: EdgeInsets.symmetric(
-                        //       horizontal: 10,
-                        //       vertical: 5,
-                        //     ),
-                        //     decoration: BoxDecoration(
-                        //       color: isMe ? Colors.teal : Colors.white,
-                        //       borderRadius: BorderRadius.circular(10),
-                        //     ),
-                        //     child: Stack(
-                        //       children: [
-                        //         Image.network(
-                        //           message['imageUrl'],
-                        //           width: 200,
-                        //           fit: BoxFit.cover,
-                        //         ),
-                        //         Positioned(
-                        //           bottom: 0,
-                        //           right: 0,
-                        //           child: Row(
-                        //             mainAxisSize: MainAxisSize.min,
-                        //             crossAxisAlignment:
-                        //                 CrossAxisAlignment.end,
-                        //             children: [
-                        //               const SizedBox(width: 6),
-                        //               Text(
-                        //                 messageTime,
-                        //                 style: TextStyle(
-                        //                   color: Color.fromARGB(
-                        //                     255,
-                        //                     71,
-                        //                     62,
-                        //                     62,
-                        //                   ),
-                        //                   fontSize: 10,
-                        //                 ),
-                        //               ),
-                        //               if (!isMe) const SizedBox(width: 4),
-                        //               getStatusIcon(message['status']),
-                        //             ],
-                        //           ),
-                        //         ),
-                        //       ],
-                        //     ),
-                        //   ),
-                        // );
-                        // }
-
-                        return GestureDetector(
-                          onLongPress: () {
-                            showDeleteDialog(context, doc.id, chatRoomId, isMe);
-                          },
-                          onHorizontalDragEnd: (details) {
-                            if (details.primaryVelocity != null &&
-                                details.primaryVelocity! > 0) {
-                              // 👉 Swiped RIGHT
+                          return Dismissible(
+                            key: ValueKey(doc.id),
+                            direction: DismissDirection.startToEnd,
+                            confirmDismiss: (direction) async {
                               onReplyMessage(
                                 message['type'] == 'image'
                                     ? '📷 Photo'
                                     : message['text'],
                                 doc.id,
                               );
-                            }
+                              return false;
+                            },
+                            background: Container(
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.only(left: 20),
+                              color: Colors.red,
+                              child: const Icon(
+                                Icons.reply,
+                                color: Colors.white,
+                              ),
+                            ),
+                            child: GestureDetector(
+                              onLongPress: () {
+                                showDeleteDialog(
+                                  context,
+                                  doc.id,
+                                  chatRoomId,
+                                  message['senderId'] == widget.senderId,
+                                );
+                              },
+                              child: Container(
+                                key: messageKeys[messageId],
+                                color:highlightedMessageId==messageId?Colors.teal.withOpacity(0.2):Colors.transparent,
+                                child: MessageBubble(
+                                  onReplyTap: () {
+                                  scrollToMessage(doc.id);
+                                },
+                                  replyText: message['replyTo'],
+                                  isMe: message['senderId'] == widget.senderId,
+                                  text: message['text'],
+                                  imageUrl: message['imageUrl'],
+                                  status: message['status'] ?? 'sent',
+                                  timestamp: message['timestamp']?.toDate(),
+                                  isDeletedForEveryone:
+                                      message['isDeletedForEveryone'] ?? false,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return Dismissible(
+                          key: ValueKey(doc.id),
+                          direction: DismissDirection.startToEnd,
+                          confirmDismiss: (direction) async {
+                            onReplyMessage(
+                              message['type'] == 'image'
+                                  ? '📷 Photo'
+                                  : message['text'],
+                              doc.id,
+                            );
+                            return false;
                           },
-                          child: MessageBubble(
-                            isMe: isMe,
-                            text: message['text'],
-                            imageUrl: null,
-                            status: message['status'] ?? 'sent',
-                            timestamp: message['timestamp']?.toDate(),
-                            isDeletedForEveryone:
-                                message['isDeletedForEveryone'] ?? false,
+                          background: Container(
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.only(left: 20),
+                            color: Colors.grey.shade300.withOpacity(0.5),
+                            child: const Icon(Icons.reply, color: Colors.white),
+                          ),
+                          child: GestureDetector(
+                            onLongPress: () {
+                              showDeleteDialog(
+                                context,
+                                doc.id,
+                                chatRoomId,
+                                isMe,
+                              );
+                            },
+
+                            child: Container(
+                              key: messageKeys[messageId],
+                              color:highlightedMessageId==messageId?Colors.teal.withOpacity(0.2):Colors.transparent,
+                              child: MessageBubble(
+                                onReplyTap: () {
+                                  scrollToMessage(doc.id);
+                                },
+                                replyText: message['replyTo'],
+                                isMe: isMe,
+                                text: message['text'],
+                                imageUrl: null,
+                                status: message['status'] ?? 'sent',
+                                timestamp: message['timestamp']?.toDate(),
+                                isDeletedForEveryone:
+                                    message['isDeletedForEveryone'] ?? false,
+                              ),
+                            ),
                           ),
                         );
-
-                        // Align(
-                        //   alignment: isMe
-                        //       ? Alignment.centerRight
-                        //       : Alignment.centerLeft,
-                        //   child: Container(
-                        //     margin: EdgeInsets.symmetric(vertical: 5),
-                        //     padding: EdgeInsets.symmetric(
-                        //       horizontal: 10,
-                        //       vertical: 5,
-                        //     ),
-                        //     decoration: BoxDecoration(
-                        //       color: isMe ? Colors.teal : Colors.white,
-                        //       borderRadius: BorderRadius.circular(10),
-                        //     ),
-                        //     child: Row(
-                        //       mainAxisSize: MainAxisSize.min,
-                        //       crossAxisAlignment: CrossAxisAlignment.end,
-                        //       children: [
-                        //         Flexible(
-                        //           child: Text(
-                        //             message['text'],
-                        //             style: TextStyle(
-                        //               color: isMe ? Colors.white : Colors.teal,
-                        //             ),
-                        //           ),
-                        //         ),
-                        //         const SizedBox(width: 6),
-                        //         Text(
-                        //           messageTime,
-                        //           style: const TextStyle(
-                        //             fontSize: 10,
-                        //             color: Color.fromARGB(255, 71, 62, 62),
-                        //           ),
-                        //         ),
-                        //         if (isMe) ...[
-                        //           const SizedBox(width: 4),
-                        //           getStatusIcon(message['status']),
-                        //         ],
-                        //       ],
-                        //     ),
-                        //   ),
-                        // );
                       },
                     );
                   },
@@ -604,102 +580,153 @@ class _ChatPageState extends State<ChatPage> {
               ),
               Container(
                 padding: EdgeInsets.all(10),
-                child: Row(
+                child: Column(
                   children: [
-                    if (selectedImage != null)
-                      Stack(
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.all(8),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                selectedImage!,
-                                height: 180,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
+                    if (replyMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        margin: const EdgeInsets.only(bottom: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Replying to",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    replyMessage!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          Positioned(
-                            top: 5,
-                            right: 5,
-                            child: IconButton(
-                              icon: const Icon(Icons.close, color: Colors.red),
+                            IconButton(
+                              icon: const Icon(Icons.close),
                               onPressed: () {
                                 setState(() {
-                                  selectedImage = null;
+                                  replyMessage = null;
+                                  replyMessageId = null;
                                 });
                               },
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-
-                    Expanded(
-                      child: TextField(
-                        controller: Chatmessagecontroller,
-                        minLines: 1,
-                        maxLines: 5,
-                        decoration: InputDecoration(
-                          contentPadding: EdgeInsets.all(10),
-                          isDense: true,
-                          isCollapsed: true,
-                          hintText: "Type a message...",
-                          hintStyle: TextStyle(color: Colors.grey),
-                          prefixIcon: Icon(
-                            Icons.emoji_emotions_outlined,
-                            size: 20,
-                            color: Colors.grey,
-                          ),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
+                    Row(
+                      children: [
+                        if (selectedImage != null)
+                          Stack(
                             children: [
-                              IconButton(
-                                onPressed: () {
-                                  pickAndSendImage(ImageSource.gallery);
-                                },
-                                icon: Icon(
-                                  Icons.attach_file,
-                                  size: 20,
-                                  color: Colors.grey,
+                              Container(
+                                margin: const EdgeInsets.all(8),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.file(
+                                    selectedImage!,
+                                    height: 180,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
-                              IconButton(
-                                onPressed: () {
-                                  pickAndSendImage(ImageSource.camera);
-                                },
-                                icon: Icon(
-                                  Icons.camera_alt_outlined,
-                                  size: 20,
-                                  color: Colors.grey,
+                              Positioned(
+                                top: 5,
+                                right: 5,
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.close,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      selectedImage = null;
+                                    });
+                                  },
                                 ),
                               ),
                             ],
                           ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide.none,
+
+                        Expanded(
+                          child: TextField(
+                            controller: Chatmessagecontroller,
+                            minLines: 1,
+                            maxLines: 5,
+                            decoration: InputDecoration(
+                              contentPadding: EdgeInsets.all(10),
+                              isDense: true,
+                              isCollapsed: true,
+                              hintText: "Type a message...",
+                              hintStyle: TextStyle(color: Colors.grey),
+                              prefixIcon: Icon(
+                                Icons.emoji_emotions_outlined,
+                                size: 20,
+                                color: Colors.grey,
+                              ),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      pickAndSendImage(ImageSource.gallery);
+                                    },
+                                    icon: Icon(
+                                      Icons.attach_file,
+                                      size: 20,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () {
+                                      pickAndSendImage(ImageSource.camera);
+                                    },
+                                    icon: Icon(
+                                      Icons.camera_alt_outlined,
+                                      size: 20,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    CircleAvatar(
-                      radius: 25,
-                      backgroundColor: Colors.teal,
-                      child: IconButton(
-                        onPressed: () async {
-                          if (Chatmessagecontroller.text.trim().isEmpty) return;
+                        SizedBox(width: 10),
+                        CircleAvatar(
+                          radius: 25,
+                          backgroundColor: Colors.teal,
+                          child: IconButton(
+                            onPressed: () async {
+                              if (Chatmessagecontroller.text.trim().isEmpty)
+                                return;
 
-                          await sendMessage(); // 🔹 send message to Firestore
-                          Chatmessagecontroller.clear(); // 🔹 clear input box
-                        
-                        },
-                        icon: Icon(Icons.send),
-                      ),
+                              await sendMessage(); // 🔹 send message to Firestore
+                              Chatmessagecontroller.clear(); // 🔹 clear input box
+                            },
+                            icon: Icon(Icons.send),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
