@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:whatsapp_new/Models/Call_Models.dart';
+import 'package:whatsapp_new/Screens/Call/incoming_call_screen.dart';
 //import 'package:whatsapp_new/Screens/Chat_Page.dart';
 import 'package:whatsapp_new/Screens/Home/Chat_ListViewscreens.dart';
 import 'package:whatsapp_new/Screens/Call/call_page.dart';
@@ -20,6 +22,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
   String? currentUserName;
   String? currentUserPhoto;
   int _selectedIndex = 0; 
+void listenForIncomingCalls() {
+  FirebaseFirestore.instance
+      .collection("calls")
+      .where("receiverId", isEqualTo: currentUserId)
+      .where("status", isEqualTo: "ringing")
+      .snapshots()
+      .listen((snapshot) {
+    if (snapshot.docs.isNotEmpty) {
+      final callData = snapshot.docs.first.data();
+      final call = CallModel.fromMap(callData);
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => IncomingCallScreen(call: call),
+        ),
+      );
+    }
+  });
+}
 
  
 
@@ -28,6 +50,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
     super.initState();
     currentUserId=FirebaseAuth.instance.currentUser!.uid;
     fetchCurrentUser();
+    listenForIncomingCalls();
+    WidgetsBinding.instance.addObserver(this);
     
   }
   Future<void> fetchCurrentUser() async {

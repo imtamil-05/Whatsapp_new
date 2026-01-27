@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:whatsapp_new/Models/Message_Models.dart';
+import 'package:whatsapp_new/Models/Call_Models.dart';
+import 'package:whatsapp_new/Screens/Call/OutgoingCall_Screen.dart';
 import 'package:whatsapp_new/Screens/Chats/widget/message_bubble.dart';
 import 'package:whatsapp_new/Widgets/Image_preview_screen.dart';
+import 'package:whatsapp_new/services/Call_services/Call_Services.dart';
 import 'package:whatsapp_new/services/supabase/Supabase_Storage_service.dart.';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -330,6 +333,30 @@ class _ChatPageState extends State<ChatPage> {
   });
 }
 
+void startCall({required String type}) async {
+  final callId = FirebaseFirestore.instance.collection('calls').doc().id;
+
+  final channelId = "${widget.senderId}_${widget.receiverId}";
+
+  final call = CallModel(
+    callId: callId,
+    callerId: widget.senderId,
+    receiverId: widget.receiverId,
+    type: type,
+    status: "ringing",
+    channelId: channelId,
+  );
+
+  await CallService().createCall(call);
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => OutgoingCallScreen(call: call),
+    ),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -374,10 +401,14 @@ class _ChatPageState extends State<ChatPage> {
 
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              startCall(type: "video");
+            },
             icon: Icon(Icons.videocam_outlined, size: 30),
           ),
-          IconButton(onPressed: () {}, icon: Icon(Icons.call_outlined)),
+          IconButton(onPressed: () {
+            startCall(type: "audio");
+          }, icon: Icon(Icons.call_outlined)),
           PopupMenuButton(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
