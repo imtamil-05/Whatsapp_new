@@ -22,6 +22,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   void initState() {
     super.initState();
     initAgora();
+    
   }
 
   Future<void> initAgora() async {
@@ -122,7 +123,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red),
                   onPressed: () async {
-                    await CallService().endCall(widget.call.callId);
+                    await CallService().endCallAndCleanup(widget.call.callId);
                     Navigator.pop(context);
                   },
                 ),

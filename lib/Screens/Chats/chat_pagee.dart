@@ -55,6 +55,8 @@ class _ChatPageState extends State<ChatPage> {
   final Map<String, GlobalKey> messageKeys = {};
   String? highlightedMessageId;
 
+  bool _calling = false;
+ 
   void showDeleteDialog(
     BuildContext context,
     String messageId,
@@ -314,28 +316,36 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void scrollToMessage(String messageId) {
-  final key = messageKeys[messageId];
-  if (key == null) return;
+    final key = messageKeys[messageId];
+    if (key == null) return;
 
-  final context = key.currentContext;
-  if (context == null) return;
+    final context = key.currentContext;
+    if (context == null) return;
 
-  Scrollable.ensureVisible(
-    context,
-    duration: const Duration(milliseconds: 300),
-    curve: Curves.easeInOut,
-  );
+    Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
 
-  setState(() => highlightedMessageId = messageId);
+    setState(() => highlightedMessageId = messageId);
 
-  Future.delayed(const Duration(seconds: 2), () {
-    setState(() => highlightedMessageId = null);
-  });
+    Future.delayed(const Duration(seconds: 2), () {
+      setState(() => highlightedMessageId = null);
+    });
+  }
+
+Future<bool> canStartCall(String peerId) async {
+  final snap = await FirebaseFirestore.instance
+      .collection("users")
+      .doc(peerId)
+      .get();
+
+  return !(snap.data()?['isOnCall'] ?? false);
 }
 
-void startCall({required String type}) async {
+Future<void> startCall({required String type}) async {
   final callId = FirebaseFirestore.instance.collection('calls').doc().id;
-
   final channelId = "${widget.senderId}_${widget.receiverId}";
 
   final call = CallModel(
@@ -347,13 +357,23 @@ void startCall({required String type}) async {
     channelId: channelId,
   );
 
+  // mark both users busy
+  await FirebaseFirestore.instance
+      .collection("users")
+      .doc(widget.currentUserId)
+      .set({"isOnCall": true}, SetOptions(merge: true));
+
+  await FirebaseFirestore.instance
+      .collection("users")
+      .doc(widget.peerUserId)
+      .set({"isOnCall": true}, SetOptions(merge: true));
+
+  // create call
   await CallService().createCall(call);
 
   Navigator.push(
     context,
-    MaterialPageRoute(
-      builder: (_) => OutgoingCallScreen(call: call),
-    ),
+    MaterialPageRoute(builder: (_) => OutgoingCallScreen(call: call)),
   );
 }
 
@@ -401,14 +421,33 @@ void startCall({required String type}) async {
 
         actions: [
           IconButton(
-            onPressed: () {
+            onPressed: () async {
+              final allowed = await canStartCall(widget.peerUserId);
+
+              if (!allowed) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("User is on another call")),
+                );
+                return;
+              }
               startCall(type: "video");
             },
             icon: Icon(Icons.videocam_outlined, size: 30),
           ),
-          IconButton(onPressed: () {
-            startCall(type: "audio");
-          }, icon: Icon(Icons.call_outlined)),
+          IconButton(
+            onPressed: () async {
+              final allowed = await canStartCall(widget.peerUserId);
+
+              if (!allowed) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("User is on another call")),
+                );
+                return;
+              }
+              startCall(type: "audio");
+            },
+            icon: Icon(Icons.call_outlined),
+          ),
           PopupMenuButton(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
@@ -538,11 +577,13 @@ void startCall({required String type}) async {
                               },
                               child: Container(
                                 key: messageKeys[messageId],
-                                color:highlightedMessageId==messageId?Colors.teal.withOpacity(0.2):Colors.transparent,
+                                color: highlightedMessageId == messageId
+                                    ? Colors.teal.withOpacity(0.2)
+                                    : Colors.transparent,
                                 child: MessageBubble(
                                   onReplyTap: () {
-                                  scrollToMessage(doc.id);
-                                },
+                                    scrollToMessage(doc.id);
+                                  },
                                   replyText: message['replyTo'],
                                   isMe: message['senderId'] == widget.senderId,
                                   text: message['text'],
@@ -587,7 +628,9 @@ void startCall({required String type}) async {
 
                             child: Container(
                               key: messageKeys[messageId],
-                              color:highlightedMessageId==messageId?Colors.teal.withOpacity(0.2):Colors.transparent,
+                              color: highlightedMessageId == messageId
+                                  ? Colors.teal.withOpacity(0.2)
+                                  : Colors.transparent,
                               child: MessageBubble(
                                 onReplyTap: () {
                                   scrollToMessage(doc.id);

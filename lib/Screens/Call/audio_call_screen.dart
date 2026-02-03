@@ -78,7 +78,7 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
               IconButton(
                 icon: const Icon(Icons.call_end, color: Colors.red),
                 onPressed: () async {
-                  await CallService().endCall(widget.call.callId);
+                  await CallService().endCallAndCleanup(widget.call.callId);
                   Navigator.pop(context);
                 },
               ),

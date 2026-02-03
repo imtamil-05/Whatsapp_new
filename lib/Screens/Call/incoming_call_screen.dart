@@ -1,14 +1,37 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:whatsapp_new/Screens/Call/audio_call_screen.dart';
 import 'package:whatsapp_new/Screens/Call/video_call_screen.dart';
 import 'package:whatsapp_new/services/Call_services/Call_Services.dart';
 import 'package:whatsapp_new/Models/Call_Models.dart';
 
-class IncomingCallScreen extends StatelessWidget {
+class IncomingCallScreen extends StatefulWidget {
   final CallModel call;
 
   const IncomingCallScreen({super.key, required this.call});
 
+  @override
+  State<IncomingCallScreen> createState() => _IncomingCallScreenState();
+}
+
+class _IncomingCallScreenState extends State<IncomingCallScreen> {
+  
+
+  @override
+  void initState() {
+    super.initState();
+      Future.delayed(const Duration(seconds: 30), () async {
+    final snap = await FirebaseFirestore.instance
+        .collection("calls")
+        .doc(widget.call.callId)
+        .get();
+
+    if (snap.exists && snap['status'] == "calling") {
+      await CallService().endCallAndCleanup(widget.call.callId);
+      if (mounted) Navigator.pop(context);
+    }
+  });
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,7 +52,7 @@ class IncomingCallScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            call.type == "video" ? "Video Call" : "Audio Call",
+            widget.call.type == "video" ? "Video Call" : "Audio Call",
             style: const TextStyle(color: Colors.white70),
           ),
           const Spacer(),
@@ -43,7 +66,7 @@ class IncomingCallScreen extends StatelessWidget {
                 child: IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.white),
                   onPressed: () async {
-                    await CallService().endCall(call.callId);
+                    await CallService().endCallAndCleanup(widget.call.callId);
                     Navigator.pop(context);
                   },
                 ),
@@ -57,16 +80,16 @@ class IncomingCallScreen extends StatelessWidget {
                   icon: const Icon(Icons.call, color: Colors.white),
                   onPressed: () async {
                     await CallService().updateCallStatus(
-                      call.callId,
+                      widget.call.callId,
                       "accepted",
                     );
 
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => call.type == "video"
-                            ? VideoCallScreen(call: call)
-                            : AudioCallScreen(call: call),
+                        builder: (_) => widget.call.type == "video"
+                            ? VideoCallScreen(call:widget.call)
+                            : AudioCallScreen(call: widget.call),
                       ),
                     );
                   },
