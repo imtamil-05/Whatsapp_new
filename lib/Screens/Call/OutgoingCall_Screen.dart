@@ -15,8 +15,6 @@ class OutgoingCallScreen extends StatefulWidget {
 }
 
 class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
-  bool _navigated = false; // 🔒 prevents double navigation
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -24,7 +22,7 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
       body: StreamBuilder<DocumentSnapshot>(
         stream: CallService().callStream(widget.call.callId),
         builder: (context, snapshot) {
-          if (!snapshot.hasData || !snapshot.data!.exists) {
+          if (!snapshot.hasData) {
             return const SizedBox();
           }
 
@@ -44,9 +42,9 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
             });
           }
 
+          /// REJECTED / ENDED → CLOSE SCREEN
           if (status == "rejected" || status == "ended") {
-            Future.microtask(() async {
-              await CallService().endCallAndCleanup(widget.call.callId);
+            Future.microtask(() {
               Navigator.pop(context);
             });
           }
@@ -80,15 +78,12 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
 
                 const Spacer(),
 
-                /// ☎️ CANCEL CALL (CALLER SIDE)
+                ///  CANCEL CALL (CALLER SIDE)
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red, size: 40),
                   onPressed: () async {
-                    await CallService().updateCallStatus(
-                      widget.call.callId,
-                      "ended",
-                    );
                     await CallService().endCallAndCleanup(widget.call.callId);
+                    Navigator.pop(context);
                   },
                 ),
 

@@ -17,6 +17,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   late RtcEngine engine;
   int? remoteUid;
   bool muted = false;
+  bool speakerOn = true;
+
 
   @override
   void initState() {
@@ -26,8 +28,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   Future<void> initAgora() async {
-    await [Permission.microphone, Permission.camera].request();
+     final permissions =
+        await [Permission.microphone, Permission.camera].request();
+    if (permissions.values.any((e) => !e.isGranted)) return;
 
+    
     engine = createAgoraRtcEngine();
     await engine.initialize(
       const RtcEngineContext(appId: AgoraConfig.appId),
@@ -35,13 +40,15 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     engine.registerEventHandler(
       RtcEngineEventHandler(
-        onUserJoined: (connection, uid, elapsed) {
-          setState(() {
-            remoteUid = uid;
-          });
+        onJoinChannelSuccess: (_, __) {
+          debugPrint("Video joined");
         },
-        onUserOffline: (connection, uid, reason) {
-          Navigator.pop(context);
+        onUserJoined: (_, uid, __) {
+          setState(() => remoteUid = uid);
+        },
+        onUserOffline: (_, __, ___) async {
+          await CallService().endCallAndCleanup(widget.call.callId);
+          if (mounted) Navigator.pop(context);
         },
       ),
     );
@@ -55,10 +62,12 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       uid: 0,
       options: const ChannelMediaOptions(),
     );
+    await engine.setEnableSpeakerphone(true);
   }
 
   @override
   void dispose() {
+    CallService().endCallAndCleanup(widget.call.callId);
     engine.leaveChannel();
     engine.release();
     super.dispose();
@@ -107,33 +116,46 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             bottom: 40,
             left: 0,
             right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    muted ? Icons.mic_off : Icons.mic,
-                    color: Colors.white,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 48),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      muted ? Icons.mic_off : Icons.mic,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      setState(() => muted = !muted);
+                      engine.muteLocalAudioStream(muted);
+                    },
                   ),
-                  onPressed: () {
-                    setState(() => muted = !muted);
-                    engine.muteLocalAudioStream(muted);
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.call_end, color: Colors.red),
-                  onPressed: () async {
-                    await CallService().endCallAndCleanup(widget.call.callId);
-                    Navigator.pop(context);
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.cameraswitch, color: Colors.white),
-                  onPressed: () {
-                    engine.switchCamera();
-                  },
-                ),
-              ],
+                  IconButton(
+                    icon: Icon(
+                      speakerOn ? Icons.volume_up : Icons.volume_off,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      setState(() => speakerOn = !speakerOn);
+                      engine.setEnableSpeakerphone(speakerOn);
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.cameraswitch, color: Colors.white),
+                    onPressed: () {
+                      engine.switchCamera();
+                    },
+                  ),
+                     IconButton(
+                    icon: const Icon(Icons.call_end, color: Colors.red),
+                    onPressed: () async {
+                      await CallService().endCallAndCleanup(widget.call.callId);
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
             ),
           )
         ],

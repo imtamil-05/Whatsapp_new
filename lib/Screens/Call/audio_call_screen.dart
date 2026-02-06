@@ -16,6 +16,7 @@ class AudioCallScreen extends StatefulWidget {
 class _AudioCallScreenState extends State<AudioCallScreen> {
   late RtcEngine engine;
   bool muted = false;
+  bool speakerOn = true;
 
   @override
   void initState() {
@@ -24,11 +25,24 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
   }
 
   Future<void> initAgora() async {
-    await [Permission.microphone].request();
+   final micStatus = await Permission.microphone.request();
+    if (!micStatus.isGranted) return; // FIX
 
     engine = createAgoraRtcEngine();
     await engine.initialize(
       const RtcEngineContext(appId: AgoraConfig.appId),
+    );
+
+     engine.registerEventHandler(
+      RtcEngineEventHandler(
+        onJoinChannelSuccess: (_, __) {
+          debugPrint("Audio joined");
+        },
+        onUserOffline: (_, __, ___) async {
+          await CallService().endCallAndCleanup(widget.call.callId);
+          if (mounted) Navigator.pop(context);
+        },
+      ),
     );
 
     await engine.enableAudio();
@@ -39,6 +53,8 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
       uid: 0,
       options: const ChannelMediaOptions(),
     );
+
+    await engine.setEnableSpeakerphone(true);
   }
 
   @override
@@ -55,13 +71,14 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const SizedBox(height: 40),
           const CircleAvatar(
             radius: 60,
             child: Icon(Icons.person, size: 50),
           ),
           const SizedBox(height: 20),
           const Text("Audio Call", style: TextStyle(color: Colors.white)),
-          const Spacer(),
+          const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -73,6 +90,16 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
                 onPressed: () {
                   setState(() => muted = !muted);
                   engine.muteLocalAudioStream(muted);
+                },
+              ),
+              IconButton(
+                icon: Icon(
+                  speakerOn ? Icons.volume_up : Icons.volume_off,
+                  color: Colors.white,
+                ),
+                onPressed: () {
+                  setState(() => speakerOn = !speakerOn);
+                  engine.setEnableSpeakerphone(speakerOn);
                 },
               ),
               IconButton(

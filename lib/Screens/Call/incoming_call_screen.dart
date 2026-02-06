@@ -18,25 +18,22 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   
 
   @override
-  void initState() {
-    super.initState();
-      Future.delayed(const Duration(seconds: 30), () async {
-    final snap = await FirebaseFirestore.instance
-        .collection("calls")
-        .doc(widget.call.callId)
-        .get();
-
-    if (snap.exists && snap['status'] == "calling") {
-      await CallService().endCallAndCleanup(widget.call.callId);
-      if (mounted) Navigator.pop(context);
-    }
-  });
-  }
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Column(
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: CallService().callStream(widget.call.callId),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const SizedBox();
+
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          final status = data['status'];
+
+          // 🔥 FIX: listen to RINGING not CALLING
+          if (status == 'ended' || status == 'rejected') {
+            Future.microtask(() => Navigator.pop(context));
+          }
+      return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Spacer(),
@@ -66,9 +63,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
                 child: IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.white),
                   onPressed: () async {
-                    await CallService().endCallAndCleanup(widget.call.callId);
-                    Navigator.pop(context);
-                  },
+                      await CallService().rejectCall(widget.call.callId);
+                      await CallService().endCallAndCleanup(widget.call.callId);
+                      Navigator.pop(context);
+                    },
                 ),
               ),
 
@@ -79,11 +77,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
                 child: IconButton(
                   icon: const Icon(Icons.call, color: Colors.white),
                   onPressed: () async {
-                    await CallService().updateCallStatus(
-                      widget.call.callId,
-                      "accepted",
-                    );
-
+                      await CallService().acceptCall(widget.call.callId);
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -99,6 +93,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
           ),
           const SizedBox(height: 60),
         ],
+      );
+        },
       ),
     );
   }
