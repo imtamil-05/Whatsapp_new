@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:whatsapp_new/Screens/Call/audio_call_screen.dart';
@@ -15,6 +18,52 @@ class OutgoingCallScreen extends StatefulWidget {
 }
 
 class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
+  final AudioPlayer _ringPlayer = AudioPlayer();
+  final AudioPlayer _voicePlayer = AudioPlayer();
+  Timer? _timeoutTimer;
+  bool _handled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startRinging();
+    _startTimeout();
+  }
+
+  Future<void> _startRinging() async {
+    await _ringPlayer.setReleaseMode(ReleaseMode.loop);
+    await _ringPlayer.play(AssetSource('sounds/ringing.mp3'));
+  }
+
+  Future<void> _stopRinging() async {
+    await _ringPlayer.stop();
+  }
+
+  void _startTimeout() {
+    _timeoutTimer = Timer(const Duration(seconds: 60), () async {
+      if (_handled) return;
+      _handled = true;
+
+      await _stopRinging();
+
+      await _voicePlayer.play(AssetSource('sounds/not_answered.mp3'));
+
+      await Future.delayed(const Duration(seconds: 3));
+
+      await CallService().endCallAndCleanup(widget.call.callId,"00:00");
+
+      if (mounted) Navigator.pop(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timeoutTimer?.cancel();
+    _ringPlayer.dispose();
+    _voicePlayer.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,7 +78,11 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           final status = data['status'];
 
-          if (status == "accepted") {
+          if (status == "accepted" && !_handled) {
+            _handled = true;
+            _timeoutTimer?.cancel();
+            _stopRinging();
+
             Future.microtask(() {
               Navigator.pushReplacement(
                 context,
@@ -43,7 +96,11 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
           }
 
           /// REJECTED / ENDED → CLOSE SCREEN
-          if (status == "rejected" || status == "ended") {
+          if ((status == "rejected" || status == "ended") && !_handled) {
+            _handled = true;
+            _timeoutTimer?.cancel();
+            _stopRinging();
+
             Future.microtask(() {
               Navigator.pop(context);
             });
@@ -82,7 +139,7 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red, size: 40),
                   onPressed: () async {
-                    await CallService().endCallAndCleanup(widget.call.callId);
+                    await CallService().endCallAndCleanup(widget.call.callId,"00:00");
                     Navigator.pop(context);
                   },
                 ),

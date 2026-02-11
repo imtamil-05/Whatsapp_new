@@ -47,6 +47,7 @@ dependencies:
   supabase_flutter: ^2.5.6
   agora_rtc_engine: ^6.2.6
   permission_handler: ^11.0.1
+  audioplayers: ^5.0.2
   
 
 
@@ -79,6 +80,9 @@ flutter:
     - assets/images/whiteWhatsapp.jpg
     - assets/images/chatbgimage.jpg
     - assets/images/WhatsappLogo.jpg
+    - assets/sounds/ringing.mp3
+    - assets/sounds/not_answer.mp3
+
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -27,6 +27,7 @@ class CallService {
   Future<void> acceptCall(String callId) async {
     await _firestore.collection('calls').doc(callId).update({
       'status': 'accepted',
+      'startedAt': FieldValue.serverTimestamp(),
     });
   }
 
@@ -36,7 +37,7 @@ class CallService {
     });
   }
 
-  Future<void> endCallAndCleanup(String callId) async {
+  Future<void> endCallAndCleanup(String callId,String duration) async {
   final callRef =
       FirebaseFirestore.instance.collection("calls").doc(callId);
 
@@ -46,6 +47,21 @@ class CallService {
   final data = snap.data()!;
   final callerId = data['callerId'];
   final receiverId = data['receiverId'];
+  final type = data['type'] ?? 'audio';
+  final startTime = data['startTime']; // Timestamp from Firestore
+
+  final now = DateTime.now();
+  
+   await FirebaseFirestore.instance.collection('call_logs').add({
+    'callId': callId,
+    'callerId': callerId,
+    'receiverId': receiverId,
+    'type': type,
+    'duration': duration,
+    'startedAt': startTime,
+    'endedAt': now,
+    'timestamp': now,
+  });
 
   // End call
   await callRef.update({"status": "ended"});
@@ -60,6 +76,7 @@ class CallService {
       .collection("users")
       .doc(receiverId)
       .update({"isOnCall": false});
+  await callRef.delete();
 }
 
 

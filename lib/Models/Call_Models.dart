@@ -27,14 +27,16 @@ class CallModel {
     };
   }
 
-  factory CallModel.fromMap(Map<String, dynamic> map) {
-    return CallModel(
-      callId: map['callId'],
-      callerId: map['callerId'],
-      receiverId: map['receiverId'],
-      type: map['type'],
-      status: map['status'],
-      channelId: map['channelId'],
-    );
-  }
+ factory CallModel.fromMap(Map<String, dynamic> map) {
+  return CallModel(
+    callId: map['callId'] ?? '',
+    callerId: map['callerId'] ?? '',
+    receiverId: map['receiverId'] ?? '',
+    type: map['type'] ?? 'audio',
+    status: map['status'] ?? 'calling',
+    channelId: map['channelId'] ?? map['callId'] ?? '',
+  );
+}
+
+
 }

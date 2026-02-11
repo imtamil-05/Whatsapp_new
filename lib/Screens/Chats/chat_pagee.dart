@@ -226,6 +226,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void markMessagesAsRead(String chatId) {
     FirebaseFirestore.instance
+    
         .collection('chats')
         .doc(chatId)
         .collection('messages')

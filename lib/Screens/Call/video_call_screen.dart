@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:whatsapp_new/Models/Call_Models.dart';
@@ -18,42 +21,58 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   int? remoteUid;
   bool muted = false;
   bool speakerOn = true;
+  Timer? _timer;
+  int _seconds = 0;
+  String _callDuration = "00:00";
+  DateTime? _startTime;
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _seconds++;
 
+      int minutes = _seconds ~/ 60;
+      int seconds = _seconds % 60;
+
+      setState(() {
+        _callDuration =
+            "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
+      });
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     initAgora();
-    
   }
 
   Future<void> initAgora() async {
-     final permissions =
-        await [Permission.microphone, Permission.camera].request();
-    if (permissions.values.any((e) => !e.isGranted)) return;
+    await [Permission.microphone, Permission.camera].request();
 
-    
     engine = createAgoraRtcEngine();
-    await engine.initialize(
-      const RtcEngineContext(appId: AgoraConfig.appId),
+    await engine.initialize(const RtcEngineContext(appId: AgoraConfig.appId));
+
+    await engine.enableVideo();
+    await engine.enableAudio();
+
+    await engine.setChannelProfile(
+      ChannelProfileType.channelProfileCommunication,
     );
+    await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
 
     engine.registerEventHandler(
       RtcEngineEventHandler(
-        onJoinChannelSuccess: (_, __) {
-          debugPrint("Video joined");
+        onUserJoined: (connection, remoteUid, elapsed) {
+          setState(() {
+            remoteUid = remoteUid;
+            _startTimer();
+          });
         },
-        onUserJoined: (_, uid, __) {
-          setState(() => remoteUid = uid);
-        },
-        onUserOffline: (_, __, ___) async {
-          await CallService().endCallAndCleanup(widget.call.callId);
-          if (mounted) Navigator.pop(context);
+        onUserOffline: (connection, remoteUid, reason) {
+          Navigator.pop(context);
         },
       ),
     );
 
-    await engine.enableVideo();
     await engine.startPreview();
 
     await engine.joinChannel(
@@ -65,9 +84,47 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     await engine.setEnableSpeakerphone(true);
   }
 
+  void listenCallStatus() {
+    FirebaseFirestore.instance
+        .collection("calls")
+        .doc(widget.call.callId)
+        .snapshots()
+        .listen((snapshot) {
+          if (!snapshot.exists) return;
+
+          final data = snapshot.data()!;
+          if (data['startTime'] != null) {
+  _startTime = (data['startTime'] as Timestamp).toDate();
+  _startDurationTimer();
+}
+          if (data['status'] == "ended") {
+            Navigator.pop(context);
+          }
+        });
+  }
+
+void _startDurationTimer() {
+  if (_startTime == null) return;
+
+  _timer?.cancel();
+
+  _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    final diff = DateTime.now().difference(_startTime!);
+
+    int minutes = diff.inMinutes;
+    int seconds = diff.inSeconds % 60;
+
+    setState(() {
+      _callDuration =
+          "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
+    });
+  });
+}
+
+
   @override
   void dispose() {
-    CallService().endCallAndCleanup(widget.call.callId);
+    _timer?.cancel();
     engine.leaveChannel();
     engine.release();
     super.dispose();
@@ -93,7 +150,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       );
     } else {
       return const Center(
-        child: Text("Waiting for user...", style: TextStyle(color: Colors.white)),
+        child: Text(
+          "Waiting for user...",
+          style: TextStyle(color: Colors.white),
+        ),
       );
     }
   }
@@ -104,6 +164,22 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
+          Positioned(
+            top: 50,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                _callDuration,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+
           Positioned.fill(child: remoteView()),
           Positioned(
             top: 40,
@@ -147,17 +223,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       engine.switchCamera();
                     },
                   ),
-                     IconButton(
+                  IconButton(
                     icon: const Icon(Icons.call_end, color: Colors.red),
                     onPressed: () async {
-                      await CallService().endCallAndCleanup(widget.call.callId);
+                      _timer?.cancel();
+                      await CallService().endCallAndCleanup(widget.call.callId,_callDuration);
                       Navigator.pop(context);
                     },
                   ),
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
     );
