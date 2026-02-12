@@ -46,76 +46,76 @@ class MessageBubble extends StatelessWidget {
     if (imageUrl != null && imageUrl!.isNotEmpty) {
       return Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          margin: EdgeInsets.symmetric(vertical: 5),
-          padding: EdgeInsets.all(5),
-          decoration: BoxDecoration(
-            color: isMe ? Colors.teal : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (replyText != null)
-               GestureDetector(
-                onTap: onReplyTap,
-                child: replyBoxUI(
-                    context
-                )),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.network(imageUrl!, width: 200, fit: BoxFit.cover),
-              ),
-              if (text != null && text!.trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    text!,
-                    style: TextStyle(color: isMe ? Colors.white : Colors.black),
-                  ),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Container(
+            margin: EdgeInsets.symmetric(vertical: 5),
+            padding: EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: isMe ? Colors.teal : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (replyText != null)
+                  GestureDetector(onTap: onReplyTap, child: replyBoxUI(context)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(imageUrl!, width: 250, fit: BoxFit.cover),
                 ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    messageTime,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isMe ? Colors.white : Colors.black,
+                if (text != null && text!.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      text!,
+                      style: TextStyle(color: isMe ? Colors.white : Colors.black),
                     ),
                   ),
-                  if (isMe) const SizedBox(width: 4),
-                  if (isMe) getStatusIcon(status),
-                ],
-              ),
-            ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      messageTime,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isMe ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    if (isMe) const SizedBox(width: 4),
+                    if (isMe) getStatusIcon(status),
+                  ],
+                ),
+              ],
+            ),
+            // Stack(
+            //   children: [
+            //     Image.network(imageUrl!, width: 200, fit: BoxFit.cover),
+            //     Positioned(
+            //       bottom: 0,
+            //       right: 0,
+            //       child: Row(
+            //         mainAxisSize: MainAxisSize.min,
+            //         children: [
+            //           Text(
+            //             messageTime,
+            //             style: TextStyle(
+            //               fontSize: 10,
+            //               color: isMe ? Colors.white : Colors.black,
+            //             ),
+            //           ),
+            //           if (isMe) const SizedBox(width: 4),
+            //           if (isMe) getStatusIcon(status),
+            //         ],
+            //       ),
+            //     ),
+            //   ],
+            // ),
           ),
-          // Stack(
-          //   children: [
-          //     Image.network(imageUrl!, width: 200, fit: BoxFit.cover),
-          //     Positioned(
-          //       bottom: 0,
-          //       right: 0,
-          //       child: Row(
-          //         mainAxisSize: MainAxisSize.min,
-          //         children: [
-          //           Text(
-          //             messageTime,
-          //             style: TextStyle(
-          //               fontSize: 10,
-          //               color: isMe ? Colors.white : Colors.black,
-          //             ),
-          //           ),
-          //           if (isMe) const SizedBox(width: 4),
-          //           if (isMe) getStatusIcon(status),
-          //         ],
-          //       ),
-          //     ),
-          //   ],
-          // ),
         ),
       );
     }
@@ -123,39 +123,36 @@ class MessageBubble extends StatelessWidget {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: 5),
+        margin: EdgeInsets.symmetric(vertical: 5, horizontal: 5),
         padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isMe ? Colors.teal : Colors.white,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (replyText != null)
-                  GestureDetector(onTap: onReplyTap, child: replyBoxUI(context)),
-
+            if (replyText != null)
+              GestureDetector(onTap: onReplyTap, child: replyBoxUI(context)),
                 Text(
                   text ?? '',
                   style: TextStyle(color: isMe ? Colors.white : Colors.black),
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Text(
-                      messageTime,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Color.fromARGB(255, 71, 62, 62),
-                      ),
-                    ),
-                  ],
+
+            const SizedBox(height: 6),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+              
+                SizedBox(width: 4),
+                Text(
+                  messageTime,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color.fromARGB(255, 71, 62, 62),
+                  ),
                 ),
                 if (isMe) ...[const SizedBox(width: 4), getStatusIcon(status)],
               ],
@@ -168,13 +165,14 @@ class MessageBubble extends StatelessWidget {
 
   Widget replyBoxUI(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(6),
-      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(3),
+      margin: const EdgeInsets.only(bottom: 5),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.08),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 3,
@@ -182,11 +180,14 @@ class MessageBubble extends StatelessWidget {
             color: isMe ? Colors.white : Colors.teal,
           ),
           const SizedBox(width: 6),
-          Text(
-            replyText!,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12),
+          Flexible(
+            fit: FlexFit.loose,
+            child: Text(
+              replyText!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12),
+            ),
           ),
         ],
       ),
@@ -207,15 +208,15 @@ class DeletedMessageBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 5),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.grey.shade300,
+          color: isMe ? Colors.teal : Colors.white,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Text(
-          'This message was deleted',
+        child: Text(
+          isMe ? '🚫You deleted this message' : 'This message was deleted',
           style: TextStyle(
             fontSize: 12,
             fontStyle: FontStyle.italic,
-            color: Colors.black54,
+            color: isMe ? Colors.grey.shade300 : Colors.black,
           ),
         ),
       ),

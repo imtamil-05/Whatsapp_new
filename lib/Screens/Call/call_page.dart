@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class CallPage extends StatefulWidget {
@@ -49,9 +50,63 @@ class _CallPageState extends State<CallPage> {
              ),
             ],
           ),
-        ],
-      )
-      
+         Expanded(
+      child: StreamBuilder(
+        stream: FirebaseFirestore.instance
+            .collection('call_logs')
+            .orderBy('timestamp', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final logs = snapshot.data!.docs;
+
+          if (logs.isEmpty) {
+            return const Center(child: Text("No call history"));
+          }
+
+          return ListView.builder(
+            itemCount: logs.length,
+            itemBuilder: (context, index) {
+              final data = logs[index];
+
+              final duration = data['duration'] ?? "00:00";
+              final type = data['type'] ?? "audio";
+
+              final isMissed = duration == "00:00";
+
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: isMissed
+                      ? Colors.red
+                      : Colors.green,
+                  child: Icon(
+                    type == "video"
+                        ? Icons.videocam
+                        : Icons.call,
+                    color: Colors.white,
+                  ),
+                ),
+                title: Text(
+                  "${data['callerId']} → ${data['receiverId']}",
+                ),
+                subtitle: Text(
+                  isMissed
+                      ? "Missed Call"
+                      : "Duration: $duration",
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              );
+            },                // need to update this page in git
+          );
+        },
+      ),
+    ),    
+  ],
+),
     );
   }
 }

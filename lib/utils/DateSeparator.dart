@@ -1,17 +1,18 @@
 import 'package:intl/intl.dart';
 
-String formatDateHeader(DateTime date) {
-  final now = DateTime.now();
+class DateSeparator {
+  static String format(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date).inDays;
 
-  final today = DateTime(now.year, now.month, now.day);
-  final yesterday = today.subtract(const Duration(days: 1));
-  final messageDate = DateTime(date.year, date.month, date.day);
-
-  if (messageDate == today) {
-    return 'Today';
-  } else if (messageDate == yesterday) {
-    return 'Yesterday';
-  } else {
-    return DateFormat('dd MMM yyyy').format(date);
+    if (difference == 0) {
+      return "Today";
+    } else if (difference == 1) {
+      return "Yesterday";
+    } else if (difference < 7) {
+      return DateFormat('EEEE').format(date); // Monday, Tuesday
+    } else {
+      return DateFormat('dd MMM yyyy').format(date); // 12 Feb 2026
+    }
   }
 }

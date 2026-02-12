@@ -7,11 +7,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:whatsapp_new/Models/Message_Models.dart';
 import 'package:whatsapp_new/Models/Call_Models.dart';
 import 'package:whatsapp_new/Screens/Call/OutgoingCall_Screen.dart';
+import 'package:whatsapp_new/Screens/Chats/widget/View_contact_Screen.dart';
 import 'package:whatsapp_new/Screens/Chats/widget/message_bubble.dart';
 import 'package:whatsapp_new/Widgets/Image_preview_screen.dart';
 import 'package:whatsapp_new/services/Call_services/Call_Services.dart';
 import 'package:whatsapp_new/services/supabase/Supabase_Storage_service.dart.';
 import 'package:image_picker/image_picker.dart';
+import 'package:whatsapp_new/utils/DateSeparator.dart';
 import 'dart:io';
 
 import 'package:whatsapp_new/utils/last_seen_formatter.dart';
@@ -54,9 +56,18 @@ class _ChatPageState extends State<ChatPage> {
   String? replyMessageId;
   final Map<String, GlobalKey> messageKeys = {};
   String? highlightedMessageId;
+  
 
   bool _calling = false;
- 
+
+  
+
+
+  String formatLastSeen(DateTime dateTime) {
+  return DateFormat('hh:mm a').format(dateTime);
+}
+
+
   void showDeleteDialog(
     BuildContext context,
     String messageId,
@@ -226,7 +237,6 @@ class _ChatPageState extends State<ChatPage> {
 
   void markMessagesAsRead(String chatId) {
     FirebaseFirestore.instance
-    
         .collection('chats')
         .doc(chatId)
         .collection('messages')
@@ -269,7 +279,6 @@ class _ChatPageState extends State<ChatPage> {
           "isDeletedForEveryone": false,
           'replyTo': replyMessage,
           'replyToId': replyMessageId,
-          'type': 'text',
         });
 
     setState(() {
@@ -281,6 +290,11 @@ class _ChatPageState extends State<ChatPage> {
       "lastMessage": Chatmessagecontroller.text,
       "lastMessageTime": FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.currentUserId)
+        .update({'isTypingTo': null});
 
     Chatmessagecontroller.clear();
   }
@@ -336,48 +350,47 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-Future<bool> canStartCall(String peerId) async {
-  final snap = await FirebaseFirestore.instance
-      .collection("users")
-      .doc(peerId)
-      .get();
+  Future<bool> canStartCall(String peerId) async {
+    final snap = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(peerId)
+        .get();
 
-  return !(snap.data()?['isOnCall'] ?? false);
-}
+    return !(snap.data()?['isOnCall'] ?? false);
+  }
 
-Future<void> startCall({required String type}) async {
-  final callId = FirebaseFirestore.instance.collection('calls').doc().id;
-  final channelId = "${widget.senderId}_${widget.receiverId}";
+  Future<void> startCall({required String type}) async {
+    final callId = FirebaseFirestore.instance.collection('calls').doc().id;
+    final channelId = "${widget.senderId}_${widget.receiverId}";
 
-  final call = CallModel(
-    callId: callId,
-    callerId: widget.senderId,
-    receiverId: widget.receiverId,
-    type: type,
-    status: "ringing",
-    channelId: channelId,
-  );
+    final call = CallModel(
+      callId: callId,
+      callerId: widget.senderId,
+      receiverId: widget.receiverId,
+      type: type,
+      status: "ringing",
+      channelId: channelId,
+    );
 
-  // mark both users busy
-  await FirebaseFirestore.instance
-      .collection("users")
-      .doc(widget.currentUserId)
-      .set({"isOnCall": true}, SetOptions(merge: true));
+    // mark both users busy
+    await FirebaseFirestore.instance
+        .collection("users")
+        .doc(widget.currentUserId)
+        .set({"isOnCall": true}, SetOptions(merge: true));
 
-  await FirebaseFirestore.instance
-      .collection("users")
-      .doc(widget.peerUserId)
-      .set({"isOnCall": true}, SetOptions(merge: true));
+    await FirebaseFirestore.instance
+        .collection("users")
+        .doc(widget.peerUserId)
+        .set({"isOnCall": true}, SetOptions(merge: true));
 
-  // create call
-  await CallService().createCall(call);
+    // create call
+    await CallService().createCall(call);
 
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => OutgoingCallScreen(call: call)),
-  );
-}
-
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OutgoingCallScreen(call: call)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -401,21 +414,52 @@ Future<void> startCall({required String type}) async {
                     ), // default image
             ),
             SizedBox(width: 10),
-            Column(
-              children: [
-                Text("${widget.receiverName}", style: TextStyle(fontSize: 18)),
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection("users")
+                  .doc(widget.peerUserId)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const SizedBox();
 
-                // Text(
-                //   user == null
-                //       ? user!['is_typing'] == true
-                //         ? 'typing...'
-                //         : user!['online'] == true
-                //    ? 'online'
-                //    : formatLastSeen(user!['last_seen'])
-                //       : '',
-                //   style: TextStyle(fontSize: 10),
-                // ),
-              ],
+                final data = snapshot.data!.data() as Map<String, dynamic>;
+                final isTyping = data['isTypingTo'] == widget.currentUserId;
+
+                  Timestamp? lastSeenTimestamp = data['lastSeen'];
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ViewContactScreen(
+                              peerUserId: widget.peerUserId,
+                              photo: widget.photo,
+                              receiverName: widget.receiverName,
+                              receiverId: widget.receiverId,            
+                            ),
+                          ),
+                        );
+                      },
+                      child: Text(widget.receiverName,
+                      style: TextStyle(fontSize: 18),
+                      ),
+                    ),
+                    Text(
+                      
+                      isTyping ? "typing..." : "last seen ${formatLastSeen((data['lastSeen'] as Timestamp).toDate())
+}",
+                      style:  TextStyle(fontSize: 10, color: isTyping ? Colors.teal: Colors.grey),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -517,6 +561,32 @@ Future<void> startCall({required String type}) async {
                         final doc = snapshot.data!.docs[index];
                         final message = doc.data() as Map<String, dynamic>;
 
+                        final Timestamp? timeStamp = message['timestamp'];
+                        final DateTime? messageDate = timeStamp?.toDate();
+
+                        bool showDateHeader = false;
+
+                        if (index == 0) {
+                          showDateHeader = true;
+                        } else {
+                          final previousDoc = snapshot.data!.docs[index - 1];
+                          final previousMessage =
+                              previousDoc.data() as Map<String, dynamic>;
+
+                          final Timestamp? previousTime =
+                              previousMessage['timestamp'];
+
+                          if (previousTime != null && messageDate != null) {
+                            final prevDate = previousTime.toDate();
+
+                            if (prevDate.day != messageDate.day ||
+                                prevDate.month != messageDate.month ||
+                                prevDate.year != messageDate.year) {
+                              showDateHeader = true;
+                            }
+                          }
+                        }
+
                         final deletedFor = List<String>.from(
                           message['deletedFor'] ?? [],
                         );
@@ -525,23 +595,11 @@ Future<void> startCall({required String type}) async {
                           return const SizedBox();
                         }
 
-                        if (message['isDeletedForEveryone'] == true) {
-                          return Center(
-                            child: Text(
-                              'This message was deleted',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
-                          );
-                        }
-
                         final messageId = doc.id;
                         messageKeys.putIfAbsent(messageId, () => GlobalKey());
 
                         final isMe = message['senderId'] == widget.senderId;
-                        final Timestamp? timeStamp = message['timestamp'];
+                        final Timestamp? timestamp = message['timestamp'];
                         final String messageTime = timeStamp != null
                             ? DateFormat('hh:mm a').format(timeStamp.toDate())
                             : '';
@@ -561,7 +619,7 @@ Future<void> startCall({required String type}) async {
                             background: Container(
                               alignment: Alignment.centerLeft,
                               padding: const EdgeInsets.only(left: 20),
-                              color: Colors.red,
+                              color: Colors.grey.shade300.withOpacity(0.5),
                               child: const Icon(
                                 Icons.reply,
                                 color: Colors.white,
@@ -599,54 +657,85 @@ Future<void> startCall({required String type}) async {
                           );
                         }
 
-                        return Dismissible(
-                          key: ValueKey(doc.id),
-                          direction: DismissDirection.startToEnd,
-                          confirmDismiss: (direction) async {
-                            onReplyMessage(
-                              message['type'] == 'image'
-                                  ? '📷 Photo'
-                                  : message['text'],
-                              doc.id,
-                            );
-                            return false;
-                          },
-                          background: Container(
-                            alignment: Alignment.centerLeft,
-                            padding: const EdgeInsets.only(left: 20),
-                            color: Colors.grey.shade300.withOpacity(0.5),
-                            child: const Icon(Icons.reply, color: Colors.white),
-                          ),
-                          child: GestureDetector(
-                            onLongPress: () {
-                              showDeleteDialog(
-                                context,
-                                doc.id,
-                                chatRoomId,
-                                isMe,
-                              );
-                            },
-
-                            child: Container(
-                              key: messageKeys[messageId],
-                              color: highlightedMessageId == messageId
-                                  ? Colors.teal.withOpacity(0.2)
-                                  : Colors.transparent,
-                              child: MessageBubble(
-                                onReplyTap: () {
-                                  scrollToMessage(doc.id);
+                        return Column(
+                          children: [
+                            if (showDateHeader && messageDate != null)
+                              Center(
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade300,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    DateSeparator.format(messageDate),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            Dismissible(
+                              key: ValueKey(doc.id),
+                              direction: DismissDirection.startToEnd,
+                              confirmDismiss: (direction) async {
+                                onReplyMessage(
+                                  message['type'] == 'image'
+                                      ? '📷 Photo'
+                                      : message['text'],
+                                  doc.id,
+                                );
+                                return false;
+                              },
+                              background: Container(
+                                alignment: Alignment.centerLeft,
+                                padding: const EdgeInsets.only(left: 20),
+                                color: Colors.grey.shade300.withOpacity(0.5),
+                                child: const Icon(
+                                  Icons.reply,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              child: GestureDetector(
+                                onLongPress: () {
+                                  showDeleteDialog(
+                                    context,
+                                    doc.id,
+                                    chatRoomId,
+                                    isMe,
+                                  );
                                 },
-                                replyText: message['replyTo'],
-                                isMe: isMe,
-                                text: message['text'],
-                                imageUrl: null,
-                                status: message['status'] ?? 'sent',
-                                timestamp: message['timestamp']?.toDate(),
-                                isDeletedForEveryone:
-                                    message['isDeletedForEveryone'] ?? false,
+
+                                child: Container(
+                                  key: messageKeys[messageId],
+                                  color: highlightedMessageId == messageId
+                                      ? Colors.teal.withOpacity(0.2)
+                                      : Colors.transparent,
+                                  child: MessageBubble(
+                                    onReplyTap: () {
+                                      scrollToMessage(doc.id);
+                                    },
+                                    replyText: message['replyTo'],
+                                    isMe: isMe,
+                                    text: message['text'],
+                                    imageUrl: null,
+                                    status: message['status'] ?? 'sent',
+                                    timestamp: message['timestamp']?.toDate(),
+                                    isDeletedForEveryone:
+                                        message['isDeletedForEveryone'] ??
+                                        false,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         );
                       },
                     );
@@ -738,6 +827,13 @@ Future<void> startCall({required String type}) async {
 
                         Expanded(
                           child: TextField(
+                            onChanged: (value) {
+                              FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(widget.currentUserId)
+                                  .update({'isTypingTo': widget.peerUserId});
+                            },
+
                             controller: Chatmessagecontroller,
                             minLines: 1,
                             maxLines: 5,
