@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:whatsapp_new/Models/Message_Models.dart';
 import 'package:whatsapp_new/Models/Call_Models.dart';
 import 'package:whatsapp_new/Screens/Call/OutgoingCall_Screen.dart';
+import 'package:whatsapp_new/Screens/Chats/widget/Full_image_view.dart';
 import 'package:whatsapp_new/Screens/Chats/widget/View_contact_Screen.dart';
 import 'package:whatsapp_new/Screens/Chats/widget/message_bubble.dart';
 import 'package:whatsapp_new/Widgets/Image_preview_screen.dart';
@@ -437,6 +438,7 @@ class _ChatPageState extends State<ChatPage> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => ViewContactScreen(
+                              chatRoomId: widget.chatRoomId,
                               peerUserId: widget.peerUserId,
                               photo: widget.photo,
                               receiverName: widget.receiverName,
@@ -603,6 +605,8 @@ class _ChatPageState extends State<ChatPage> {
                         final String messageTime = timeStamp != null
                             ? DateFormat('hh:mm a').format(timeStamp.toDate())
                             : '';
+
+                        final imageUrl = message['imageUrl'];
                         if (message['type'] == 'image') {
                           return Dismissible(
                             key: ValueKey(doc.id),
@@ -625,7 +629,21 @@ class _ChatPageState extends State<ChatPage> {
                                 color: Colors.white,
                               ),
                             ),
+                            
                             child: GestureDetector(
+                            
+                                  onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FullImageView(
+                        imageUrl: imageUrl!,
+                        fromChat: true,
+                      ),
+                    ),
+                  );
+                },
+                            
                               onLongPress: () {
                                 showDeleteDialog(
                                   context,
